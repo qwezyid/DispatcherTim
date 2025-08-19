@@ -279,7 +279,6 @@ const GroupDetails: React.FC<{id:number; onChanged:()=>void}> = ({id, onChanged}
     }) as { path: string[] };
 
     alert(`Авто-маршрут: ${res.path.join(" → ")}`);
-  };
 
   const linkCarrier = async ()=>{
     if(!carrierLink.carrier_id) return;
