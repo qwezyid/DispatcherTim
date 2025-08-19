@@ -273,11 +273,12 @@ const GroupDetails: React.FC<{id:number; onChanged:()=>void}> = ({id, onChanged}
     setPath(""); setTitle(""); await load(); onChanged();
   };
 
-  const autoDerive = async ()=>{
-    if(!auto.origin || !auto.destination) return;
-    const res = await api(`/route-groups/auto-derive`, {method:"POST", body: JSON.stringify(auto)});
+    const res = await api(`/route-groups/auto-derive`, {
+    method: "POST",
+    body: JSON.stringify(auto)
+    }) as { path: string[] };
+
     alert(`Авто-маршрут: ${res.path.join(" → ")}`);
-    await load();
   };
 
   const linkCarrier = async ()=>{
