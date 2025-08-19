@@ -15,12 +15,15 @@ PG_DSN = os.environ["PG_DSN"]
 JWT_SECRET = os.environ.get("JWT_SECRET", "change_me")
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*")
 
+app = FastAPI()  # <-- создать приложение ДО использования
+
+# Можно управлять из переменной окружения: ALLOWED_ORIGINS="https://dispatcher-tim.vercel.app,http://localhost:3000"
+_allowed = os.environ.get("ALLOWED_ORIGINS", "https://dispatcher-tim.vercel.app,http://localhost:3000")
+allow_origins = ["*"] if _allowed.strip() == "*" else [o.strip() for o in _allowed.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://dispatcher-tim.vercel.app",  # твой фронт на Vercel
-        "http://localhost:3000"               # для локальной отладки
-    ],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
