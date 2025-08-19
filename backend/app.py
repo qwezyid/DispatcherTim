@@ -369,26 +369,64 @@ def search_carriers(origin:str, destination:str, limit:int=50, conn=Depends(db))
     return results[:limit]
 
 # --------- SHIPMENTS & REPORTS ----------
+# --------- SHIPMENTS & REPORTS ----------
 @app.get("/shipments")
-def list_shipments(origin: Optional[str]=None, destination: Optional[str]=None,
-                   date_from: Optional[str]=None, date_to: Optional[str]=None,
-                   carrier: Optional[str]=None, limit:int=200, offset:int=0, conn=Depends(db)):
-    where = []; params=[]
+def list_shipments(
+    origin: Optional[str] = None,
+    destination: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    carrier: Optional[str] = None,   # может быть ID или часть ФИО
+    limit: int = 200,
+    offset: int = 0,
+    conn=Depends(db)
+):
+    where = []
+    params: list = []
+
+    # фильтры по городу — ставим алиас s.
     if origin:
-        where.append("lower(origin_city) = lower(%s)"); params.append(origin)
+        where.append("lower(s.origin_city) = lower(%s)")
+        params.append(origin)
     if destination:
-        where.append("lower(destination_city) = lower(%s)"); params.append(destination)
+        where.append("lower(s.destination_city) = lower(%s)")
+        params.append(destination)
+
+    # даты
     if date_from:
-        where.append("created_at >= %s"); params.append(date_from)
+        where.append("s.created_at >= %s")
+        params.append(date_from)
     if date_to:
-        where.append("created_at <= %s"); params.append(date_to)
+        where.append("s.created_at <= %s")
+        params.append(date_to)
+
+    # фильтр по перевозчику:
+    # - если пришла цифра → по ID
+    # - иначе ищем по ФИО (ILIKE)
     if carrier:
-        where.append("carrier_id = %s"); params.append(carrier)
-    sql = "SELECT * FROM shipments"
-    if where: sql += " WHERE " + " AND ".join(where)
-    sql += " ORDER BY COALESCE(closed_at, created_at) DESC LIMIT %s OFFSET %s"
+        if str(carrier).isdigit():
+            where.append("s.carrier_id = %s")
+            params.append(int(carrier))
+        else:
+            where.append("c.name ILIKE %s")
+            params.append(f"%{carrier}%")
+
+    sql = """
+    SELECT
+      s.*,
+      c.name  AS carrier_name,
+      c.phone AS carrier_phone
+    FROM shipments s
+    LEFT JOIN carriers c ON c.id = s.carrier_id
+    """
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+
+    sql += " ORDER BY COALESCE(s.closed_at, s.created_at) DESC LIMIT %s OFFSET %s"
     params += [limit, offset]
-    cur = conn.cursor(); cur.execute(sql, params)
+
+    cur = conn.cursor()
+    cur.execute(sql, params)
     return cur.fetchall()
 
 @app.post("/shipments")
@@ -406,6 +444,16 @@ def create_shipment(p: ShipmentCreate, conn=Depends(db)):
                 (sid, norm_city(p.origin_city), sid, norm_city(p.destination_city)))
     conn.commit()
     return {"id": sid}
+
+@app.delete("/route-groups/{group_id}")
+def delete_group(group_id: int, conn=Depends(db)):
+    cur = conn.cursor()
+    cur.execute("DELETE FROM carrier_group_links WHERE group_id=%s", (group_id,))
+    cur.execute("DELETE FROM route_groups WHERE id=%s", (group_id,))  # каскадом удалятся варианты/точки
+    if cur.rowcount = 0:
+        raise HTTPException(status_code=404, detail="Group not found")
+    conn.commit()
+    return {"status":"deleted"}
 
 @app.get("/reports/groups.csv")
 def report_groups(conn=Depends(db)):
