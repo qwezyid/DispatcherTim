@@ -270,15 +270,21 @@ const GroupDetails: React.FC<{id:number; onChanged:()=>void}> = ({id, onChanged}
   const createVariant = async ()=>{
     if(!path) return;
     await api(`/route-groups/${id}/variants`, {method:"POST", body: JSON.stringify({title, path})});
-    setPath(""); setTitle(""); await load(); onChanged();
+    setPath("");
+    setTitle("");
+    await load();
+    onChanged();
   };
 
+  const autoDerive = async ()=>{
+    if(!auto.origin || !auto.destination) return;
     const res = await api(`/route-groups/auto-derive`, {
-    method: "POST",
-    body: JSON.stringify(auto)
+      method: "POST",
+      body: JSON.stringify(auto)
     }) as { path: string[] };
-
     alert(`Авто-маршрут: ${res.path.join(" → ")}`);
+    await load();
+  };
 
   const linkCarrier = async ()=>{
     if(!carrierLink.carrier_id) return;
@@ -338,7 +344,7 @@ const GroupDetails: React.FC<{id:number; onChanged:()=>void}> = ({id, onChanged}
   );
 };
 
-const VariantView: React.FC<{variant:any}> = ({variant})=>{
+const VariantView: React.FC<{variant:any}> = ({variant})=>{: React.FC<{variant:any}> = ({variant})=>{
   const stops = (variant.stops||[]).map((s:any)=> s.city);
   return (
     <Card className="">
