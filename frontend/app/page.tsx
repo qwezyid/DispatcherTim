@@ -245,7 +245,16 @@ const RouteGroupCard: React.FC<{group:any; onChanged:()=>void}> = ({group, onCha
       <CardHeader
         title={`${group.city_a} — ${group.city_b}`}
         subtitle={`Рейсов: ${group.trips||0} | Водителей: ${group.drivers||0} | Средняя: ${fmt(group.avg_price)} ₽ | Диапазон: ${fmt(group.min_price)}–${fmt(group.max_price)} ₽ | Сумма: ${fmt(group.total_price)} ₽`}
-        right={<Button variant="ghost" onClick={()=>setOpen(o=>!o)}>{open?"Скрыть":"Открыть"}</Button>}
+        right={
+  <div className="flex gap-2">
+    <Button variant="outline" onClick={()=>setOpen(o=>!o)}>{open?"Скрыть":"Открыть"}</Button>
+    <Button variant="ghost" onClick={async()=>{
+      if (!confirm("Удалить группу и все её варианты?")) return;
+      await api(`/route-groups/${group.id}`, { method: "DELETE" });
+      onChanged();
+    }}>Удалить</Button>
+  </div>
+}
       />
       {open && <CardBody>
         <GroupDetails id={group.id} onChanged={onChanged} />
