@@ -562,7 +562,11 @@ const DealsTab: React.FC = () => {
                     <td className="py-2 pr-4">{fmtDate(r.created_at)}</td>
                     <td className="py-2 pr-4">{fmtDate(r.closed_at)}</td>
                     <td className="py-2 pr-4">{fmt(r.price_cost_rub)} ₽</td>
-                    <td className="py-2 pr-4">{r.carrier_id||"—"}</td>
+                    <td className="py-2 pr-4">
+                      {r.carrier_name 
+                        ? `${r.carrier_name}${r.carrier_phone ? " ("+r.carrier_phone+")" : ""}` 
+                        : "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
