@@ -434,11 +434,11 @@ def create_shipment(p: ShipmentCreate, conn=Depends(db)):
 def delete_group(group_id: int, conn=Depends(db)):
     cur = conn.cursor()
     cur.execute("DELETE FROM carrier_group_links WHERE group_id=%s", (group_id,))
-    cur.execute("DELETE FROM route_groups WHERE id=%s", (group_id,))  # каскадом удалятся варианты/точки
+    cur.execute("DELETE FROM route_groups WHERE id=%s", (group_id,))  # CASCADE удалит варианты/точки
     if cur.rowcount == 0:
         raise HTTPException(status_code=404, detail="Group not found")
     conn.commit()
-    return {"status":"deleted"}
+    return {"status": "deleted"}
 
 @app.get("/reports/groups.csv")
 def report_groups(conn=Depends(db)):
