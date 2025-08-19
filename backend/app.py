@@ -15,11 +15,15 @@ PG_DSN = os.environ["PG_DSN"]
 JWT_SECRET = os.environ.get("JWT_SECRET", "change_me")
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*")
 
-app = FastAPI(title="Dispatcher MVP")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[ALLOWED_ORIGINS] if ALLOWED_ORIGINS != "*" else ["*"],
-    allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
+    allow_origins=[
+        "https://dispatcher-tim.vercel.app",  # твой фронт на Vercel
+        "http://localhost:3000"               # для локальной отладки
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # --- простейшая авторизация (логин/пароль в env) ---
@@ -450,7 +454,7 @@ def delete_group(group_id: int, conn=Depends(db)):
     cur = conn.cursor()
     cur.execute("DELETE FROM carrier_group_links WHERE group_id=%s", (group_id,))
     cur.execute("DELETE FROM route_groups WHERE id=%s", (group_id,))  # каскадом удалятся варианты/точки
-    if cur.rowcount = 0:
+    if cur.rowcount == 0:
         raise HTTPException(status_code=404, detail="Group not found")
     conn.commit()
     return {"status":"deleted"}
