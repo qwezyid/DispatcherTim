@@ -344,7 +344,7 @@ const GroupDetails: React.FC<{id:number; onChanged:()=>void}> = ({id, onChanged}
   );
 };
 
-const VariantView: React.FC<{variant:any}> = ({variant})=>{: React.FC<{variant:any}> = ({variant})=>{
+const VariantView: React.FC<{variant:any}> = ({variant})=>{
   const stops = (variant.stops||[]).map((s:any)=> s.city);
   return (
     <Card className="">
