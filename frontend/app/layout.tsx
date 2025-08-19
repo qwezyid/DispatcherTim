@@ -1,6 +1,8 @@
+import "./globals.css";
+
 export const metadata = {
   title: "Диспетчер перевозок",
-  description: "Внутренняя система диспетчеризации"
+  description: "Внутренняя система диспетчеризации",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
