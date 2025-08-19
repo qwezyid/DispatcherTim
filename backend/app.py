@@ -315,65 +315,43 @@ def link_carrier(carrier_id:int, p: CarrierGroupLink, conn=Depends(db)):
     conn.commit()
     return {"id": lid, "default_variant_id": p.default_variant_id}
 
+# ПОИСК ПЕРЕВОЗЧИКОВ ПО ОТРЕЗКУ МАРШРУТА
 @app.get("/carriers/search")
-def search_carriers(origin:str, destination:str, limit:int=50, conn=Depends(db)):
-    o, d = norm_city(origin), norm_city(destination)
+def search_carriers(origin: str, destination: str, conn=Depends(db)):
+    """
+    Находит водителей, привязанных к группе того варианта,
+    где origin и destination встречаются в правильном порядке (so.seq < sd.seq).
+    Если у водителя задан default_variant_id, фильтруем по нему.
+    Возвращает: carrier_id, name, phone, path (список городов по отрезку).
+    """
     cur = conn.cursor()
-    # найдём группы для пары
-    gid = ensure_group(conn, o, d)
-    # найдём перевозчиков, у кого либо default_variant покрывает отрезок, либо любой вариант группы
-    # 1) все варианты этой группы
-    cur.execute("SELECT id FROM route_variants WHERE group_id=%s AND is_active=TRUE", (gid,))
-    group_variant_ids = [r["id"] for r in cur.fetchall()]
-    if not group_variant_ids:
-        return []  # пока нет вариантов — вернём пусто
-
-    # соберём stops для этих вариантов
-    variant_stops = {}
-    for vid in group_variant_ids:
-        cur.execute("SELECT city, seq FROM route_variant_stops WHERE variant_id=%s ORDER BY seq", (vid,))
-        variant_stops[vid] = cur.fetchall()
-
-    def covers(vid)->bool:
-        stops = variant_stops[vid]
-        city_to_seq = {s["city"].lower(): s["seq"] for s in stops}
-        if o.lower() not in city_to_seq or d.lower() not in city_to_seq:
-            return False
-        return city_to_seq[o.lower()] < city_to_seq[d.lower()] or city_to_seq[d.lower()] < city_to_seq[o.lower()]
-
-    # связи перевозчиков по группе
     cur.execute("""
-    SELECT cgl.id, c.id as carrier_id, c.name, c.phone, cgl.default_variant_id
-    FROM carrier_group_links cgl
-    JOIN carriers c ON c.id=cgl.carrier_id
-    WHERE cgl.group_id=%s
-    """,(gid,))
-    links = cur.fetchall()
-    results=[]
-    for l in links:
-        if l["default_variant_id"]:
-            if covers(l["default_variant_id"]):
-                vid = l["default_variant_id"]
-                # построим фактический срез
-                stops = variant_stops[vid]
-                m = {s["city"].lower(): s["seq"] for s in stops}
-                so, sd = m[o.lower()], m[d.lower()]
-                path = [s["city"] for s in (stops if so<sd else reversed(stops)) if min(so,sd) <= s["seq"] <= max(so,sd)]
-                results.append({"carrier_id": l["carrier_id"], "name": l["name"], "phone": l["phone"], "variant_id": vid, "path": path})
-        else:
-            # любой вариант группы
-            matched = None
-            for vid in group_variant_ids:
-                if covers(vid):
-                    stops = variant_stops[vid]
-                    m = {s["city"].lower(): s["seq"] for s in stops}
-                    so, sd = m[o.lower()], m[d.lower()]
-                    path = [s["city"] for s in (stops if so<sd else reversed(stops)) if min(so,sd) <= s["seq"] <= max(so,sd)]
-                    matched = {"carrier_id": l["carrier_id"], "name": l["name"], "phone": l["phone"], "variant_id": vid, "path": path}
-                    break
-            if matched:
-                results.append(matched)
-    return results[:limit]
+    WITH seg AS (
+      SELECT rv.id AS variant_id, rv.group_id,
+             so.seq AS start_seq, sd.seq AS end_seq
+      FROM route_variant_stops so
+      JOIN route_variant_stops sd
+        ON sd.variant_id = so.variant_id AND sd.seq > so.seq
+      JOIN route_variants rv ON rv.id = so.variant_id
+      WHERE lower(so.city) = lower(%s) AND lower(sd.city) = lower(%s)
+    )
+    SELECT DISTINCT
+      c.id   AS carrier_id,
+      c.name AS name,
+      c.phone AS phone,
+      (
+        SELECT array_agg(s.city ORDER BY s.seq)
+        FROM route_variant_stops s
+        WHERE s.variant_id = seg.variant_id
+          AND s.seq BETWEEN seg.start_seq AND seg.end_seq
+      ) AS path
+    FROM seg
+    JOIN carrier_group_links cgl ON cgl.group_id = seg.group_id
+    JOIN carriers c ON c.id = cgl.carrier_id
+    WHERE cgl.default_variant_id IS NULL
+       OR cgl.default_variant_id = seg.variant_id
+    """, (origin, destination))
+    return cur.fetchall()
 
 # --------- SHIPMENTS & REPORTS ----------
 # --------- SHIPMENTS & REPORTS ----------
